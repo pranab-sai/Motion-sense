@@ -1,1 +1,1 @@
-# Motion-sense
+# Motion sense wearable geasture control
