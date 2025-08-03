@@ -1,0 +1,137 @@
+#include <Wire.h>
+#include <ESP8266WiFi.h>
+#include "ThingSpeak.h"
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_ADXL345_U.h>
+Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified();
+
+#define SCREEN_WIDTH 128  // OLED display width, in pixels
+#define SCREEN_HEIGHT 64  // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+#define fan 14
+#define bulb 12
+#define BUZZ 10
+const char* ssid = "project";      // your network SSID (name)
+const char* password = "123456789";  // your network password
+
+WiFiClient client;
+
+unsigned long myChannelNumber = 2933252;
+const char* myWriteAPIKey = "3ZQOMNGT3F8KIDE1";
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(BUZZ, OUTPUT);
+  pinMode(fan, OUTPUT);
+  pinMode(bulb, OUTPUT);
+  delay(200);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  // Address 0x3D for 128x64
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;)
+      ;
+  }
+  delay(200);
+  if (!accel.begin()) {
+    Serial.println("No valid sensor found");
+    while (1)
+      ;
+  }
+  delay(100);
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println("MotionSense : Smart Wearable Gesture control with Accelerometers");
+  display.display();
+  delay(500);
+  WiFi.mode(WIFI_STA);
+  ThingSpeak.begin(client);
+  // Connect or reconnect to WiFi
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.print("Attempting to connect");
+    while (WiFi.status() != WL_CONNECTED) {
+      WiFi.begin(ssid, password);
+      delay(5000);
+    }
+  }
+}
+
+void loop() {
+
+  display.clearDisplay();
+  sensors_event_t event;
+  accel.getEvent(&event);
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 0);
+  display.println("MEMS : ");
+  display.println(event.acceleration.x);
+  display.println(event.acceleration.y);
+  display.println(event.acceleration.z);
+  display.display();
+  delay(100);
+  if (event.acceleration.x >= 8 && event.acceleration.y <= 0 ) {
+    digitalWrite(BUZZ, HIGH);
+    digitalWrite(fan, HIGH);
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0, 30);
+    display.println("Fan is ON");
+    display.display();
+    delay(200);
+    digitalWrite(BUZZ, LOW);
+    ThingSpeak.setField(1, '1');
+    ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+  } else if (event.acceleration.x <= 0 && event.acceleration.y <= 0 && event.acceleration.z <= 3) {
+    digitalWrite(BUZZ, HIGH);
+    digitalWrite(fan, LOW);
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0, 30);
+    display.println("Fan is OFF");
+    display.display();
+    delay(200);
+    digitalWrite(BUZZ, LOW);
+    ThingSpeak.setField(1, '0');
+    ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+  } else if (event.acceleration.x <= 3 && event.acceleration.y <= -4 && event.acceleration.z <= 0) {
+    digitalWrite(BUZZ, HIGH);
+    digitalWrite(bulb, HIGH);
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0, 30);
+    display.println("Bulb is ON");
+    display.display();
+    delay(200);
+    digitalWrite(BUZZ, LOW);
+    ThingSpeak.setField(2, '1');
+    ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+  } else if (event.acceleration.x <= 0 && event.acceleration.y >= 5 && event.acceleration.z <= 0) {
+    digitalWrite(BUZZ, HIGH);
+    digitalWrite(bulb, LOW);
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0, 30);
+    display.println("Bulb is OFF");
+    display.display();
+    delay(200);
+    digitalWrite(BUZZ, LOW);
+    ThingSpeak.setField(2, '0');
+    ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+  } else {
+    digitalWrite(BUZZ, LOW);
+    digitalWrite(fan, LOW);
+    digitalWrite(bulb, LOW);
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0, 40);
+    display.println("Gesture Not Registered");
+    display.display();
+    delay(300);
+  }
+}
